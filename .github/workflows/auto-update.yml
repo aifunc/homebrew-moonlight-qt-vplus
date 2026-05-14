@@ -5,6 +5,10 @@ on:
     - cron: "0 8 * * *"
   workflow_dispatch:
 
+concurrency:
+  group: auto-update-moonlight-qt-vplus
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -110,7 +114,8 @@ jobs:
                 .[] |
                 select(.draft == false) |
                 .tag_name as $tag |
-                (.assets[]? | select(.name | endswith(".dmg"))) as $dmg |
+                ([.assets[]? | select(.name | endswith(".dmg"))] | first) as $dmg |
+                select($dmg != null) |
                 select($dmg.browser_download_url != null) |
                 select($dmg.digest != null and ($dmg.digest | startswith("sha256:"))) |
                 [
