@@ -1,0 +1,4 @@
+.env
+.secrets
+.actrc
+scripts/act-colima

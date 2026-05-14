@@ -1,0 +1,82 @@
+name: Auto Update Moonlight Qt VPlus
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # 忽略Node.js警告
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get latest release and update cask
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          API="https://api.github.com/repos/qiin2333/moonlight-qt/releases/latest"
+          CURL_ARGS=(-fsSL -H "Accept: application/vnd.github+json")
+          if [ -n "${GITHUB_TOKEN:-}" ]; then
+            CURL_ARGS+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+          fi
+
+          read -r VER DMG_URL SHA256 < <(
+            curl "${CURL_ARGS[@]}" "$API" | jq -r '
+              .tag_name as $tag |
+              (.assets[] | select(.name | endswith(".dmg"))) as $dmg |
+              [
+                ($tag | sub("^v"; "")),
+                $dmg.browser_download_url,
+                ($dmg.digest | sub("^sha256:"; ""))
+              ] | @tsv
+            '
+          )
+
+          test -n "$VER"
+          test "$VER" != "null"
+          test -n "$DMG_URL"
+          test "$DMG_URL" != "null"
+          test -n "$SHA256"
+          test "$SHA256" != "null"
+
+          FILE=Casks/moonlight-qt-vplus.rb
+          CURRENT_VER=$(sed -n 's/^  version "\(.*\)"/\1/p' "$FILE")
+          CURRENT_SHA256=$(sed -n 's/^  sha256 "\(.*\)"/\1/p' "$FILE")
+          CURRENT_URL=$(sed -n 's/^  url "\(.*\)"/\1/p' "$FILE")
+
+          if [ "$CURRENT_VER" = "$VER" ] && [ "$CURRENT_SHA256" = "$SHA256" ] && [ "$CURRENT_URL" = "$DMG_URL" ]; then
+            echo "Already up to date: $VER"
+            exit 0
+          fi
+
+          sed -i "s/version \".*\"/version \"$VER\"/" "$FILE"
+          sed -i "s|sha256 \".*\"|sha256 \"$SHA256\"|" "$FILE"
+          sed -i "s|url \".*\"|url \"$DMG_URL\"|" "$FILE"
+
+      - name: Commit and push changes
+        if: ${{ !env.ACT }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/moonlight-qt-vplus.rb
+
+          if git diff --cached --quiet; then
+            echo "No cask changes to commit."
+            exit 0
+          fi
+
+          VER=$(sed -n 's/^  version "\(.*\)"/\1/p' Casks/moonlight-qt-vplus.rb)
+          git commit -m "Update moonlight-qt-vplus to $VER"
+          git push
