@@ -4,21 +4,31 @@ on:
   schedule:
     - cron: "0 8 * * *"
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Internal: publish the current tag"
+        required: false
+        default: "false"
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
-  update:
+  prepare-release:
+    if: ${{ github.event_name != 'push' && inputs.publish != 'true' }}
     runs-on: ubuntu-latest
     env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # 忽略Node.js警告
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Get latest release and update cask
+      - name: Create release branch and tag
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -30,53 +40,105 @@ jobs:
             CURL_ARGS+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
           fi
 
-          read -r VER DMG_URL SHA256 < <(
+          read -r TAG VER DMG_NAME DMG_URL SHA256 < <(
             curl "${CURL_ARGS[@]}" "$API" | jq -r '
               .tag_name as $tag |
               (.assets[] | select(.name | endswith(".dmg"))) as $dmg |
               [
+                $tag,
                 ($tag | sub("^v"; "")),
+                $dmg.name,
                 $dmg.browser_download_url,
                 ($dmg.digest | sub("^sha256:"; ""))
               ] | @tsv
             '
           )
 
+          test -n "$TAG"
+          test "$TAG" != "null"
           test -n "$VER"
           test "$VER" != "null"
+          test -n "$DMG_NAME"
+          test "$DMG_NAME" != "null"
           test -n "$DMG_URL"
           test "$DMG_URL" != "null"
           test -n "$SHA256"
           test "$SHA256" != "null"
 
-          FILE=Casks/moonlight-qt-vplus.rb
-          CURRENT_VER=$(sed -n 's/^  version "\(.*\)"/\1/p' "$FILE")
-          CURRENT_SHA256=$(sed -n 's/^  sha256 "\(.*\)"/\1/p' "$FILE")
-          CURRENT_URL=$(sed -n 's/^  url "\(.*\)"/\1/p' "$FILE")
-
-          if [ "$CURRENT_VER" = "$VER" ] && [ "$CURRENT_SHA256" = "$SHA256" ] && [ "$CURRENT_URL" = "$DMG_URL" ]; then
-            echo "Already up to date: $VER"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists. Nothing to publish."
             exit 0
           fi
+
+          BRANCH="release/$TAG"
+          FILE=Casks/moonlight-qt-vplus.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --create "$BRANCH"
 
           sed -i "s/version \".*\"/version \"$VER\"/" "$FILE"
           sed -i "s|sha256 \".*\"|sha256 \"$SHA256\"|" "$FILE"
           sed -i "s|url \".*\"|url \"$DMG_URL\"|" "$FILE"
 
-      - name: Commit and push changes
-        if: ${{ !env.ACT }}
+          git add "$FILE"
+          if git diff --cached --quiet; then
+            echo "Cask already matches $TAG."
+          else
+            git commit -m "Update moonlight-qt-vplus to $VER"
+          fi
+
+          git push origin "$BRANCH"
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
+
+          curl -fsSL \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/auto-update.yml/dispatches" \
+            -d "{\"ref\":\"$TAG\",\"inputs\":{\"publish\":\"true\"}}"
+
+  publish-release:
+    if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.publish == 'true') }}
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Read cask metadata
         run: |
           set -euo pipefail
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Casks/moonlight-qt-vplus.rb
+          FILE=Casks/moonlight-qt-vplus.rb
+          VER=$(sed -n 's/^  version "\(.*\)"/\1/p' "$FILE")
+          SHA256=$(sed -n 's/^  sha256 "\(.*\)"/\1/p' "$FILE")
+          DMG_URL=$(sed -n 's/^  url "\(.*\)"/\1/p' "$FILE")
 
-          if git diff --cached --quiet; then
-            echo "No cask changes to commit."
-            exit 0
-          fi
+          test -n "$VER"
+          test "$VER" != "-"
+          test -n "$SHA256"
+          test "$SHA256" != "-"
+          test -n "$DMG_URL"
 
-          VER=$(sed -n 's/^  version "\(.*\)"/\1/p' Casks/moonlight-qt-vplus.rb)
-          git commit -m "Update moonlight-qt-vplus to $VER"
-          git push
+          {
+            echo "VER=$VER"
+            echo "SHA256=$SHA256"
+            echo "DMG_URL=$DMG_URL"
+          } >> "$GITHUB_ENV"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: |
+            Homebrew cask update for Moonlight Qt VPlus.
+
+            Upstream release: https://github.com/qiin2333/moonlight-qt/releases/tag/${{ github.ref_name }}
+            DMG URL: ${{ env.DMG_URL }}
+            SHA256: `${{ env.SHA256 }}`
+          make_latest: true
