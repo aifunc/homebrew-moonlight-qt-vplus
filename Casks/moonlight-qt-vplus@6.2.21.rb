@@ -1,15 +1,14 @@
-cask "moonlight-qt-vplus" do
-  version "6.2.80"
-  sha256 "365d6a2271433207585e341805de59a8b3ccef7caec2b9fe323e5328437e6f44"
+cask "moonlight-qt-vplus@6.2.21" do
+  version "6.2.21"
+  sha256 "ac34e2e8509ba4ec69a6b37ca95f7f119d09d531dda4ba3274d451013c56b734"
 
-  url "https://github.com/qiin2333/moonlight-qt/releases/download/v6.2.80/Moonlight-6.2.80-2.g34e6c374.dmg"
+  url "https://github.com/qiin2333/moonlight-qt/releases/download/v6.2.21/Moonlight-6.2.21.dmg"
   name "Moonlight Qt V+"
   desc "Modified Moonlight game streaming client (qiin2333 fork)"
   homepage "https://github.com/qiin2333/moonlight-qt"
 
   livecheck do
-    url :url
-    strategy :github_latest
+    skip "Versioned cask"
   end
 
   app "Moonlight.app"
