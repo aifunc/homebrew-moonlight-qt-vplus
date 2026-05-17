@@ -1,6 +1,6 @@
 cask "moonlight-qt-vplus@6.2.81" do
   version "6.2.81"
-  sha256 "6b2ba7fc695fac2dd0b52697d75d14bf31149b0986c84a9fb3eac5813f8f8bf7"
+  sha256 "bfd9074ab4b978d183eb9b58491280496074cb3a029f69346303901199ce9d32"
 
   url "https://github.com/qiin2333/moonlight-qt/releases/download/v6.2.81/Moonlight-6.2.81.dmg"
   name "Moonlight Qt V+"
