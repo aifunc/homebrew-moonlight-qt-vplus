@@ -1,6 +1,6 @@
 cask "moonlight-qt-vplus@6.2.90-filemapping-test.2" do
   version "6.2.90-filemapping-test.2"
-  sha256 "a0a00913c667c1d99cdbb543f8f098453bc5b42749b5adf4c41f3d6d51b0fbb6"
+  sha256 "8279fea2a08d0903e8db49ff2068272c097a395a13c9f7b87556f5be4d63dbd3"
 
   url "https://github.com/qiin2333/moonlight-qt/releases/download/v6.2.90-filemapping-test.2/Moonlight-6.2.84.dmg"
   name "Moonlight Qt V+"
