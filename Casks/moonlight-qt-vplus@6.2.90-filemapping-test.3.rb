@@ -1,4 +1,4 @@
-cask "moonlight-qt-vplus" do
+cask "moonlight-qt-vplus@6.2.90-filemapping-test.3" do
   version "6.2.90-filemapping-test.3"
   sha256 "903b7a31d3b36ca1b4bb7660b386797ae87dc59659bd233e7e829f42fe1d6cd3"
 
@@ -8,8 +8,7 @@ cask "moonlight-qt-vplus" do
   homepage "https://github.com/qiin2333/moonlight-qt"
 
   livecheck do
-    url :url
-    strategy :github_latest
+    skip "Versioned cask"
   end
 
   app "Moonlight.app"
