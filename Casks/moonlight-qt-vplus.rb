@@ -1,8 +1,8 @@
 cask "moonlight-qt-vplus" do
-  version "6.3.4"
-  sha256 "3642ea2c6732e118cfdb1784ae8edb811ed56d2cacda507f9f2eef477f1e37e0"
+  version "6.3.5"
+  sha256 "dbf8a4834b9048c144060cde001722922156080e1bafe629507b7b28060e0488"
 
-  url "https://github.com/qiin2333/moonlight-qt/releases/download/v6.3.4/Moonlight-6.3.4-arm64.dmg"
+  url "https://github.com/qiin2333/moonlight-qt/releases/download/v6.3.5/Moonlight-6.3.5-arm64.dmg"
   name "Moonlight Qt V+"
   desc "Modified Moonlight game streaming client (qiin2333 fork)"
   homepage "https://github.com/qiin2333/moonlight-qt"
